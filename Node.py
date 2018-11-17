@@ -21,13 +21,13 @@ class Node(RelativePosition):
         self.cap_neighbors = nn.INIT_CAP_NEIGHBORS
 
     def getX(self):
-        return self.translation[0][3]
+        return self.translation[0]
 
     def getY(self):
-        return self.translation[1][3]
+        return self.translation[1]
 
     def getZ(self):
-        return self.translation[2][3]
+        return self.translation[2]
 
     def set_index(self, index):
         self.index = index

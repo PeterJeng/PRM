@@ -4,19 +4,20 @@ from math import sqrt, pi, cos, sin, acos
 import numpy as np
 import quaternion
 from scipy.spatial import distance
+from nearest_neighbors import *
 
 # import rospy
 
 edge_list = []
-vertex_list = {}
+vertex_list = []
 
 
 def generate_quaternion():
     s = random.uniform(0, 1)
     sig_1 = sqrt(1 - s)
     sig_2 = sqrt(s)
-    angle_1 = 2 * pi * random()
-    angle_2 = 2 * pi * random()
+    angle_1 = 2 * pi * random.random()
+    angle_2 = 2 * pi * random.random()
     w = cos(angle_2) * sig_2
     x = sin(angle_1) * sig_1
     y = cos(angle_1) * sig_1
@@ -28,14 +29,31 @@ def generate_quaternion():
 # Compute the quaternion inner product lambda
 # Return a range between [-1,1]
 def quaternion_distance(q1, q2):
-    first = acos((q1.w * q2.w) + (q1.x * q2.x) + (q1.y * q2.y) + (q1.z * q2.z))
-    second = acos((q1.w * -q2.w) + (q1.x * -q2.x) + (q1.y * -q2.y) + (q1.z * -q2.z))
+    first = (q1.w * q2.w) + (q1.x * q2.x) + (q1.y * q2.y) + (q1.z * q2.z)
+    second = (q1.w * -q2.w) + (q1.x * -q2.x) + (q1.y * -q2.y) + (q1.z * -q2.z)
 
-    return min(first, second)
+    if math.isclose(1.0, first, rel_tol=1e-9):
+        first = 1.0
+
+    if math.isclose(1.0, second, rel_tol=1e-9):
+        second = 1.0
+
+    if math.isclose(-1.0, first, rel_tol=1e-9):
+        print("hit!")
+        first = -1.0
+
+    if math.isclose(-1.0, second, rel_tol=1e-9):
+        second = -1.0
+
+    return min(acos(first), acos(second))
 
 
 def translation_distance(t1, t2):
     return distance.euclidean(t1, t2)
+
+
+def distance_func(start, goal):
+    return translation_distance(start.translation, goal.translation) + quaternion_distance(start.rotation, goal.rotation)
 
 
 def collision_free_configuration(translation_matrix, rotation_matrix):
@@ -67,66 +85,48 @@ def collision_free_path(path):
     return True
 
 
-def slerp(v0, v1, t_array):
-    # >>> slerp([1,0,0,0],[0,0,0,1],np.arange(0,1,0.001))
-    t_array = np.array(t_array)
-    v0 = np.array(v0)
-    v1 = np.array(v1)
-    dot = np.sum(v0 * v1)
-
-    if dot < 0.0:
-        v1 = -v1
-        dot = -dot
-
-    DOT_THRESHOLD = 0.9995
-    if dot > DOT_THRESHOLD:
-        result = v0[np.newaxis, :] + t_array[:, np.newaxis] * (v1 - v0)[np.newaxis, :]
-        result = result / np.linalg.norm(result)
-        return result
-
-    theta_0 = np.arccos(dot)
-    sin_theta_0 = np.sin(theta_0)
-
-    theta = theta_0 * t_array
-    sin_theta = np.sin(theta)
-
-    s0 = np.cos(theta) - dot * sin_theta / sin_theta_0
-    s1 = sin_theta / sin_theta_0
-    return (s0[:, np.newaxis] * v0[np.newaxis, :]) + (s1[:, np.newaxis] * v1[np.newaxis, :])
-
-
 if __name__ == "__main__":
     iteration = int(input("How many iterations?"))
+    k_nearest = int(input("How many k closest neighbors?"))
+
+    roadmap = NearestNeighbors(distance_func)
+
+    start_node = Node([0, 0, 0], generate_quaternion())
+    goal_node = Node([9, 9, 9], generate_quaternion())
+
+    vertex_list.append(start_node)
+    vertex_list.append(goal_node)
 
     for n in range(iteration):
-        print("Iteration: " + str(n + 1))
-
         good_sample = False
-        translation_matrix = []
-        rotation_matrix = []
 
         while not good_sample:
             # generate a random transformation matrix inside the world space
             t_matrix = [random.uniform(-10, 10), random.uniform(-10, 10), random.uniform(0, 5)]
 
             # generate a random quaternion
-            r_matrix = quaternion.as_rotation_matrix(generate_quaternion())
+            q = generate_quaternion()
+            r_matrix = [item for sublist in quaternion.as_rotation_matrix(q) for item in sublist]
 
-            if collision_free_configuration(t_matrix, r_matrix) == 0:
+            # takes a len = 3 t_matrix and a len = 9 r_matrix
+            # if collision_free_configuration(t_matrix, r_matrix) == 0:
+            if 1 == 1:
                 good_sample = True
                 translation_matrix = t_matrix
-                rotation_matrix = r_matrix
 
-        current_node = Node(translation_matrix, rotation_matrix)
+                current_node = Node(translation_matrix, q)
 
-        # add node to vertex_list, might need to build this differently
-        if current_node not in vertex_list:
-            vertex_list.append(current_node)
+                vertex_list.append(current_node)
+                roadmap.add_node(current_node)
 
-        # create a neighborhood of nodes given a node
-        neighborhood_list = neighborhood(current_node, vertex_list, edge_list)
+    for current_node in vertex_list:
+        # initialize two different array for keeping track of k closest neighbors
+        dist = [0] * k_nearest
+        closest_nodes = [0] * k_nearest
 
-        for neighbor_node in neighborhood_list:
+        roadmap.find_k_close(current_node, closest_nodes, dist, k_nearest)
+
+        for neighbor_node in closest_nodes:
             path = local_planner(current_node, neighbor_node)
 
             if collision_free_path(path):

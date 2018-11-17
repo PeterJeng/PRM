@@ -31,7 +31,7 @@ class NearestNeighbors:
     def __init__(self, distance_function):
         self.nodes = pad_or_truncate([], INIT_NODE_SIZE, None)
         self.second_nodes = pad_or_truncate([], MAX_KK, None)
-        self.second_distances = pad_or_truncate([], MAX_KK, sys.maxint)
+        self.second_distances = pad_or_truncate([], MAX_KK, sys.maxsize)
         self.nr_nodes = 0
         self.cap_nodes = INIT_NODE_SIZE
         self.added_node_id = 0
@@ -246,7 +246,7 @@ class NearestNeighbors:
             right = high
 
             while left < right:
-                while low <= high and distances[left] <= pivot_distance:
+                while left <= high and distances[left] <= pivot_distance:
                     left += 1
                 while distances[right] > pivot_distance:
                     right -= 1
@@ -281,7 +281,7 @@ class NearestNeighbors:
 
         min_index = -1
         index = 0
-        for i in range(0, nr_samples):
+        for i in range(0, int(nr_samples)):
             index = random.randint(0, self.nr_nodes - 1)
             distance = self.distance_function(self.nodes[index], state)
             if distance < min_distance:
