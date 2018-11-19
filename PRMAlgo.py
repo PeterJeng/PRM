@@ -69,21 +69,30 @@ def collision_free_configuration(translation_matrix, rotation_matrix):
         print("Service Call Failed: %s", e)
 
 
-
 # local planner
 def local_planner(cnode, nnode):
-    interpolated_quaternion = slerp([cnode.w, cnode.x, cnode.y, cnode.z], [nnode.w, nnode.x, nnode.y, nnode.z], [0.1])
+    slerp_vector = slerp([cnode.rotation.w, cnode.rotation.x, cnode.rotation.y, cnode.rotation.z],
+                         [nnode.rotation.w, nnode.rotation.x, nnode.rotation.y, nnode.rotation.z],
+                         [0.1])
 
-    for i in range(5):
-        print()
+    slerp_vector = [item for sublist in slerp_vector for item in sublist]
 
-    return "connect two vertex"
+    slerp_quaternion = quaternion.quaternion(slerp_vector[0], slerp_vector[1], slerp_vector[2], slerp_vector[3])
+
+    # find the midpoint between cnode and nnode
+    mid = midpoint(cnode.translation, nnode.translation)
+
+    # find the midpoint between cnode and mid
+    mid1 = midpoint(cnode.translation, mid)
+
+    # find the midpoint between mid and nnode
+    mid2 = midpoint(nnode.translation, mid)
+
+    return [mid, mid1, mid2], slerp_quaternion
 
 
-# use multiple calls of collision_free_config
-def collision_free_path(path):
-
-    return True
+def midpoint(p1, p2):
+    return [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2]
 
 
 def slerp(v0, v1, t_array):
@@ -174,10 +183,23 @@ if __name__ == "__main__":
 
         # check to see if the edge between the two nodes are valid
         for neighbor_node in closest_nodes:
-            path = local_planner(current_node, neighbor_node)
+            path, temp_quaternion = local_planner(current_node, neighbor_node)
 
-            if collision_free_path(path):
-                current_node.add_node(neighbor_node)
+            r_matrix = [item for sublist in quaternion.as_rotation_matrix(temp_quaternion) for item in sublist]
+
+            collision_free = True
+
+            # for t_matrix in path:
+                # collision has occurred
+                # if collision_free_configuration(t_matrix, r_matrix) == 1:
+                #     collision_free = False
 
 
+            if collision_free:
+                current_node.add_to_neighbor_list(neighbor_node)
 
+
+    for node in vertex_list:
+        print(node.translation, node.rotation)
+        for neighbor in node.neighbor_list:
+            print(node, ":" , neighbor.translation, neighbor.rotation)

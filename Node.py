@@ -19,6 +19,7 @@ class Node(RelativePosition):
         self.added_index = 0
         self.index = 0
         self.cap_neighbors = nn.INIT_CAP_NEIGHBORS
+        self.neighbor_list = []
 
     def getX(self):
         return self.translation[0]
@@ -69,5 +70,9 @@ class Node(RelativePosition):
         if index >= self.nr_neighbors:
             return
         self.neighbors[index] = new_index
+
+    def add_to_neighbor_list(self, nr):
+        self.neighbor_list.append(nr)
+
 
 
