@@ -5,10 +5,10 @@ import numpy as np
 import quaternion
 from scipy.spatial import distance
 from nearest_neighbors import *
-
+from Search import Graph
 # import rospy
 
-edge_list = []
+graph_list = []
 vertex_list = []
 
 
@@ -122,6 +122,12 @@ def slerp(v0, v1, t_array):
     s1 = sin_theta / sin_theta_0
     return (s0[:, np.newaxis] * v0[np.newaxis, :]) + (s1[:, np.newaxis] * v1[np.newaxis, :])
 
+def node_to_string(node):
+    s1 = " ".join(str(x) for x in node.translation)
+    s2 = " ".join(str(x) for x in quaternion.as_euler_angles(node.rotation))
+
+    return "T: " + s1 + " R: " + s2
+
 
 if __name__ == "__main__":
     # User inputs how many starting samples and how many edges per neighbor
@@ -148,7 +154,7 @@ if __name__ == "__main__":
             # random sampling
             # generate a random transformation matrix inside the world space
             # the z-axis value is temporary, may need to fix, but x and y should be fine
-            t_matrix = [random.uniform(-10, 10), random.uniform(-10, 10), random.uniform(0, 5)]
+            t_matrix = [random.uniform(0, 10), random.uniform(0, 10), random.uniform(0, 1)]
 
             # generate a random quaternion
             q = generate_quaternion()
@@ -181,6 +187,7 @@ if __name__ == "__main__":
         # node that dist and closest_node are modified now
         roadmap.find_k_close(current_node, closest_nodes, dist, k_nearest)
 
+        i = 0
         # check to see if the edge between the two nodes are valid
         for neighbor_node in closest_nodes:
             path, temp_quaternion = local_planner(current_node, neighbor_node)
@@ -195,11 +202,24 @@ if __name__ == "__main__":
                 #     collision_free = False
 
 
-            if collision_free:
+            if collision_free and dist[i] != 0:
+                edge = (node_to_string(current_node), node_to_string(neighbor_node), dist[i])
+                reverse_edge = (node_to_string(neighbor_node), node_to_string(current_node), dist[i])
+                graph_list.append(edge)
+                graph_list.append(reverse_edge)
                 current_node.add_to_neighbor_list(neighbor_node)
 
+            i += 1
 
-    for node in vertex_list:
-        print(node.translation, node.rotation)
-        for neighbor in node.neighbor_list:
-            print(node, ":" , neighbor.translation, neighbor.rotation)
+
+    # for node in vertex_list:
+    #     print(node.translation, node.rotation)
+    #     for neighbor in node.neighbor_list:
+    #         print(node, ":", neighbor.translation, neighbor.rotation)
+    #         print(quaternion.as_euler_angles(node.rotation))
+
+    graph = Graph(graph_list)
+    solution_path = graph.dijkstra(node_to_string(start_node), node_to_string(goal_node))
+
+    for point in solution_path:
+        print(point)
